@@ -27,7 +27,7 @@ const byte MFRC522::FIFO_SIZE = 64;
 const uint8_t MFRC522::UNUSED_PIN = UINT8_MAX;
 
 #if (MFRC522_DEVICE & MFRC522_DEVICE_FAMILY_PI)
-MFRC522::MFRC522()
+MFRC522::MFRC522(int channel, int resetPin)
 {
 #if (MFRC522_DEVICE == MFRC522_DEVICE_RASPBERRYPI)
 
@@ -36,17 +36,40 @@ MFRC522::MFRC522()
 		printf("Failed to initialize. This tool needs root access, use sudo.\n");
 	}
 
-	bcm2835_gpio_fsel(RSTPIN, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_write(RSTPIN, LOW);
+	if (resetPin != -1)
+	{
+	  _rstPin = resetPin;
+	}
+	else
+	{
+	  _rstPin = RSTPIN;
+	}
+	bcm2835_gpio_fsel(_rstPin, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_write(_rstPin, LOW);
 	// Set SPI bus to work with MFRC522 chip.
 	setSPIConfig();
-
 #elif (MFRC522_DEVICE == MFRC522_DEVICE_NANOPI)
 
 	wiringPiSetup();
-	pinMode(RSTPIN, OUTPUT);
-	digitalWrite(RSTPIN, LOW);
+	if (resetPin != -1)
+	{
+	  _rstPin = resetPin;
+	}
+	else
+	{
+	  _rstPin = RSTPIN;
+	}
+	pinMode(_rstPin, OUTPUT);
+	digitalWrite(_rstPin, LOW);
 
+	if (channel != -1)
+	{
+	  _channel = channel;
+	}
+	else
+	{
+	  _channel = SPI_CHAN;
+	}
 	setSPIConfig();
 
 #endif
@@ -68,7 +91,7 @@ void MFRC522::setSPIConfig()
 	bcm2835_spi_setChipSelectPolarity(BCM2835_SPI_CS0, LOW);      // the default
 
 #elif (MFRC522_DEVICE == MFRC522_DEVICE_NANOPI)
-	wiringPiSPISetup(SPI_CHAN, SPI_SPEED);
+	wiringPiSPISetup(_channel, SPI_SPEED);
 
 #endif
 
@@ -117,7 +140,7 @@ void MFRC522::PCD_WriteRegister(PCD_Register reg,	///< The register to write to.
 	unsigned char data[2];
 	data[0] = reg & 0x7E;
 	data[1] = value;
-	wiringPiSPIDataRW(SPI_CHAN, data, 2);
+	wiringPiSPIDataRW(_channel, data, 2);
 
 #endif
 } // End PCD_WriteRegister()
@@ -189,7 +212,7 @@ byte MFRC522::PCD_ReadRegister(PCD_Register reg	///< The register to read from. 
 	unsigned char data[2];
 	data[0] = 0x80 | ((reg) & 0x7E);
 	data[1] = 0x00;
-	wiringPiSPIDataRW(SPI_CHAN, data, 2);
+	wiringPiSPIDataRW(_channel, data, 2);
 	return (byte)data[1];
 
 #endif
@@ -286,7 +309,7 @@ void MFRC522::PCD_ReadRegister(PCD_Register reg,	///< The register to read from.
 	}
 
 	buffer[count] = 0x00;
-	wiringPiSPIDataRW(SPI_CHAN, buffer, count + 1);
+	wiringPiSPIDataRW(_channel, buffer, count + 1);
 
 	if (rxAlign)
 	{
@@ -424,9 +447,9 @@ void MFRC522::PCD_Init()
 	
 #elif (MFRC522_DEVICE == MFRC522_DEVICE_RASPBERRYPI)
 
-	if (bcm2835_gpio_lev(RSTPIN) == LOW)  	//The MFRC522 chip is in power down mode.
+	if (bcm2835_gpio_lev(_rstPin) == LOW)  	//The MFRC522 chip is in power down mode.
 	{
-		bcm2835_gpio_write(RSTPIN, HIGH);		// Exit power down mode. This triggers a hard reset.
+		bcm2835_gpio_write(_rstPin, HIGH);		// Exit power down mode. This triggers a hard reset.
 		// Section 8.8.2 in the datasheet says the oscillator start-up time is the start up time of the crystal + 37,74�s. Let us be generous: 50ms.
 		delay(50);
 	}
@@ -437,9 +460,9 @@ void MFRC522::PCD_Init()
 
 #elif (MFRC522_DEVICE == MFRC522_DEVICE_NANOPI)
 
-	if (digitalRead(RSTPIN) == LOW)
+	if (digitalRead(_rstPin) == LOW)
 	{
-		digitalWrite(RSTPIN, HIGH);
+		digitalWrite(_rstPin, HIGH);
 		delay(50);
 	}
 	else

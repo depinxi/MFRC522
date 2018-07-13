@@ -345,7 +345,7 @@ public:
 		  _spiClass(spiClass), _spiSettings(spiSettings) {};
 	MFRC522() : MFRC522(UNUSED_PIN, UNUSED_PIN) {};
 #elif (MFRC522_DEVICE & MFRC522_DEVICE_FAMILY_PI)
-	MFRC522();
+	MFRC522(int channel = -1, int resetPin = -1);
 	void setSPIConfig();
 #endif
 	
@@ -445,6 +445,9 @@ protected:
 	byte _chipSelectPin;		// Arduino pin connected to MFRC522's SPI slave select input (Pin 24, NSS, active low)
 	byte _resetPowerDownPin;	// Arduino pin connected to MFRC522's reset and power down input (Pin 6, NRSTPD, active low)
 	
+	byte _channel;
+	byte _rstPin;
+
 #if (MFRC522_DEVICE == MFRC522_DEVICE_ARDUINO)
 	// SPI communication
 	SPIClass *_spiClass;		// SPI class which abstracts hardware.
