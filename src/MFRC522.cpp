@@ -6,6 +6,8 @@
 
 #include "MFRC522.h"
 #include "MFRC522Debug.h"
+ #include <string.h>
+ #include <stdlib.h>
 
 #if (MFRC522_DEVICE == MFRC522_DEVICE_ARDUINO)
 #	include <Arduino.h>
@@ -53,7 +55,7 @@ MFRC522::MFRC522(int channel, int resetPin)
 	wiringPiSetup();
 	if (resetPin != -1)
 	{
-	  _rstPin = resetPin;
+	  _rstPin = (byte)resetPin;
 	}
 	else
 	{
@@ -64,7 +66,7 @@ MFRC522::MFRC522(int channel, int resetPin)
 
 	if (channel != -1)
 	{
-	  _channel = channel;
+	  _channel = (byte)channel;
 	}
 	else
 	{
@@ -210,7 +212,7 @@ byte MFRC522::PCD_ReadRegister(PCD_Register reg	///< The register to read from. 
 #elif (MFRC522_DEVICE == MFRC522_DEVICE_NANOPI)
 
 	unsigned char data[2];
-	data[0] = 0x80 | ((reg) & 0x7E);
+	data[0] = (unsigned char)(0x80 | ((reg) & 0x7E));
 	data[1] = 0x00;
 	wiringPiSPIDataRW(_channel, data, 2);
 	return (byte)data[1];
@@ -305,7 +307,7 @@ void MFRC522::PCD_ReadRegister(PCD_Register reg,	///< The register to read from.
 
 	for (int i = 0; i < count; ++i)
 	{
-		buffer[i] = 0x80 | (reg & 0x7E);
+		buffer[i] = (unsigned char )(0x80 | (reg & 0x7E));
 	}
 
 	buffer[count] = 0x00;
@@ -313,8 +315,8 @@ void MFRC522::PCD_ReadRegister(PCD_Register reg,	///< The register to read from.
 
 	if (rxAlign)
 	{
-		byte mask = (0xff << rxAlign) & 0xff;
-		values[0] = (values[0] & ~mask) | (buffer[1] & mask);
+		byte mask = (byte)((0xff << rxAlign) & 0xff);
+		values[0] = (byte)((values[0] & ~mask) | (buffer[1] & mask));
 	}
 	else
 	{
@@ -351,7 +353,7 @@ void MFRC522::PCD_ClearRegisterBitMask(PCD_Register reg,	///< The register to up
 {
 	byte tmp;
 	tmp = PCD_ReadRegister(reg);
-	PCD_WriteRegister(reg, tmp & (~mask));		// clear bit mask
+	PCD_WriteRegister(reg,(byte)( tmp & (~mask)));		// clear bit mask
 } // End PCD_ClearRegisterBitMask()
 
 
@@ -691,7 +693,7 @@ void MFRC522::PCD_SoftPowerDown() //Note : Only soft power down mode is availabl
 void MFRC522::PCD_SoftPowerUp()
 {
 	byte val = PCD_ReadRegister(CommandReg); // Read state of the command register
-	val &= ~(1 << 4); // set PowerDown bit ( bit 4 ) to 0
+	val &= (byte)(~(1 << 4)); // set PowerDown bit ( bit 4 ) to 0
 	PCD_WriteRegister(CommandReg, val);//write new value to the command register
 	// wait until PowerDown bit is cleared (this indicates end of wake up procedure)
 	const uint32_t timeout = (uint32_t)millis() + 500;// create timer for timeout (just in case)
@@ -749,7 +751,7 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(byte command,		///< The com
 {
 	// Prepare values for BitFramingReg
 	byte txLastBits = validBits ? *validBits : 0;
-	byte bitFraming = (rxAlign << 4) + txLastBits;		// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
+	byte bitFraming = (byte)((rxAlign << 4) + txLastBits);		// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
 	
 	PCD_WriteRegister(CommandReg, PCD_Idle);			// Stop any active command.
 	PCD_WriteRegister(ComIrqReg, 0x7F);					// Clear all seven interrupt request bits
@@ -847,7 +849,7 @@ MFRC522::StatusCode MFRC522::PCD_CommunicateWithPICC(byte command,		///< The com
 		
 		// Verify CRC_A - do our own calculation and store the control in controlBuffer.
 		byte controlBuffer[2];
-		MFRC522::StatusCode status = PCD_CalculateCRC(&backData[0], *backLen - 2, &controlBuffer[0]);
+		MFRC522::StatusCode status = PCD_CalculateCRC(&backData[0], (byte)(*backLen - 2), &controlBuffer[0]);
 		
 		if (status != STATUS_OK)
 		{
@@ -1025,7 +1027,7 @@ MFRC522::StatusCode MFRC522::PICC_Select(Uid *uid,			///< Pointer to Uid struct.
 		}
 		
 		// How many UID bits are known in this Cascade Level?
-		currentLevelKnownBits = validBits - (8 * uidIndex);
+		currentLevelKnownBits = (byte)(validBits - (8 * uidIndex));
 		
 		if (currentLevelKnownBits < 0)
 		{
@@ -1040,7 +1042,7 @@ MFRC522::StatusCode MFRC522::PICC_Select(Uid *uid,			///< Pointer to Uid struct.
 			buffer[index++] = PICC_CMD_CT;
 		}
 		
-		byte bytesToCopy = currentLevelKnownBits / 8 + (currentLevelKnownBits % 8 ? 1 : 0); // The number of bytes needed to represent the known bits for this level.
+		byte bytesToCopy = (byte)(currentLevelKnownBits / 8 + (currentLevelKnownBits % 8 ? 1 : 0)); // The number of bytes needed to represent the known bits for this level.
 		
 		if (bytesToCopy)
 		{
@@ -1051,16 +1053,16 @@ MFRC522::StatusCode MFRC522::PICC_Select(Uid *uid,			///< Pointer to Uid struct.
 				bytesToCopy = maxBytes;
 			}
 			
-			for (count = 0; count < bytesToCopy; count++)
+			for (count = 0; (count < bytesToCopy) && (index < (sizeof(buffer) / sizeof(byte))); ++count, ++index)
 			{
-				buffer[index++] = uid->uidByte[uidIndex + count];
+				buffer[index] = uid->uidByte[uidIndex + count];
 			}
 		}
 		
 		// Now that the data has been copied we need to include the 8 bits in CT in currentLevelKnownBits
 		if (useCascadeTag)
 		{
-			currentLevelKnownBits += 8;
+			currentLevelKnownBits = (byte)(currentLevelKnownBits + 8);
 		}
 		
 		// Repeat anti collision loop until we can transmit all UID bits + BCC and receive a SAK - max 32 iterations.
@@ -1094,17 +1096,17 @@ MFRC522::StatusCode MFRC522::PICC_Select(Uid *uid,			///< Pointer to Uid struct.
 				//Serial.print(F("ANTICOLLISION: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
 				txLastBits		= currentLevelKnownBits % 8;
 				count			= currentLevelKnownBits / 8;	// Number of whole bytes in the UID part.
-				index			= 2 + count;					// Number of whole bytes: SEL + NVB + UIDs
-				buffer[1]		= (index << 4) + txLastBits;	// NVB - Number of Valid Bits
-				bufferUsed		= index + (txLastBits ? 1 : 0);
+				index			= (byte)(2 + count);					// Number of whole bytes: SEL + NVB + UIDs
+				buffer[1]		= (byte)((index << 4) + txLastBits);	// NVB - Number of Valid Bits
+				bufferUsed		= (byte)(index + (txLastBits ? 1 : 0));
 				// Store response in the unused part of buffer
 				responseBuffer	= &buffer[index];
-				responseLength	= sizeof(buffer) - index;
+				responseLength	= (byte)(sizeof(buffer) - index);
 			}
 			
 			// Set bit adjustments
 			rxAlign = txLastBits;											// Having a separate variable is overkill. But it makes the next line easier to read.
-			PCD_WriteRegister(BitFramingReg, (rxAlign << 4) + txLastBits);	// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
+			PCD_WriteRegister(BitFramingReg, (byte)((rxAlign << 4) + txLastBits));	// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
 			
 			// Transmit the buffer and receive the response.
 			result = PCD_TransceiveData(buffer, bufferUsed, responseBuffer, &responseLength, &txLastBits, rxAlign);
@@ -1132,9 +1134,9 @@ MFRC522::StatusCode MFRC522::PICC_Select(Uid *uid,			///< Pointer to Uid struct.
 				
 				// Choose the PICC with the bit set.
 				currentLevelKnownBits = collisionPos;
-				count			= (currentLevelKnownBits - 1) % 8; // The bit to modify
-				index			= 1 + (currentLevelKnownBits / 8) + (count ? 1 : 0); // First byte is index 0.
-				buffer[index]	|= (1 << count);
+				count			= (byte)((currentLevelKnownBits - 1) % 8); // The bit to modify
+				index			= (byte)(1 + (currentLevelKnownBits / 8) + (count ? 1 : 0)); // First byte is index 0.
+				buffer[index]	= (byte)(buffer[index] | (1 << count));
 			}
 			else if (result != STATUS_OK)
 			{
@@ -1198,7 +1200,7 @@ MFRC522::StatusCode MFRC522::PICC_Select(Uid *uid,			///< Pointer to Uid struct.
 	} // End of while (!uidComplete)
 	
 	// Set correct uid->size
-	uid->size = 3 * cascadeLevel + 1;
+	uid->size = (byte)(3 * cascadeLevel + 1);
 	
 	return STATUS_OK;
 } // End PICC_Select()
@@ -1578,18 +1580,18 @@ MFRC522::StatusCode MFRC522::MIFARE_SetValue(byte blockAddr, int32_t value)
 	byte buffer[18];
 	
 	// Translate the int32_t into 4 bytes; repeated 2x in value block
-	buffer[0] = buffer[ 8] = (value & 0xFF);
-	buffer[1] = buffer[ 9] = (value & 0xFF00) >> 8;
-	buffer[2] = buffer[10] = (value & 0xFF0000) >> 16;
-	buffer[3] = buffer[11] = (value & 0xFF000000) >> 24;
+	buffer[0] = buffer[ 8] = (byte)(value & 0xFF);
+	buffer[1] = buffer[ 9] = (byte)((value & 0xFF00) >> 8);
+	buffer[2] = buffer[10] = (byte)((value & 0xFF0000) >> 16);
+	buffer[3] = buffer[11] = (byte)((value & 0xFF000000) >> 24);
 	// Inverse 4 bytes also found in value block
-	buffer[4] = ~buffer[0];
-	buffer[5] = ~buffer[1];
-	buffer[6] = ~buffer[2];
-	buffer[7] = ~buffer[3];
+	buffer[4] = (byte)~buffer[0];
+	buffer[5] = (byte)~buffer[1];
+	buffer[6] = (byte)~buffer[2];
+	buffer[7] = (byte)~buffer[3];
 	// Address 2x with inverse address 2x
-	buffer[12] = buffer[14] = blockAddr;
-	buffer[13] = buffer[15] = ~blockAddr;
+	buffer[12] = buffer[14] = (byte)blockAddr;
+	buffer[13] = buffer[15] = (byte)~blockAddr;
 	
 	// Write the whole data block
 	return MIFARE_Write(blockAddr, buffer, 16);
@@ -1680,7 +1682,7 @@ MFRC522::StatusCode MFRC522::PCD_MIFARE_Transceive(byte *sendData,		///< Pointer
 		return result;
 	}
 	
-	sendLen += 2;
+	sendLen = (byte)(sendLen + 2);
 	
 	// Transceive the data, store the reply in cmdBuffer[]
 	byte waitIRq = 0x30;		// RxIRq and IdleIRq
@@ -2249,13 +2251,13 @@ void MFRC522::MIFARE_SetAccessBits(byte *accessBitBuffer,	///< Pointer to byte 6
                                    byte g3					///< Access bits C1 C2 C3] for the sector trailer, block 3 (for sectors 0-31) or block 15 (for sectors 32-39)
                                   )
 {
-	byte c1 = ((g3 & 4) << 1) | ((g2 & 4) << 0) | ((g1 & 4) >> 1) | ((g0 & 4) >> 2);
-	byte c2 = ((g3 & 2) << 2) | ((g2 & 2) << 1) | ((g1 & 2) << 0) | ((g0 & 2) >> 1);
-	byte c3 = ((g3 & 1) << 3) | ((g2 & 1) << 2) | ((g1 & 1) << 1) | ((g0 & 1) << 0);
+	byte c1 = (byte)(((g3 & 4) << 1) | ((g2 & 4) << 0) | ((g1 & 4) >> 1) | ((g0 & 4) >> 2));
+	byte c2 = (byte)(((g3 & 2) << 2) | ((g2 & 2) << 1) | ((g1 & 2) << 0) | ((g0 & 2) >> 1));
+	byte c3 = (byte)(((g3 & 1) << 3) | ((g2 & 1) << 2) | ((g1 & 1) << 1) | ((g0 & 1) << 0));
 	
-	accessBitBuffer[0] = (~c2 & 0xF) << 4 | (~c1 & 0xF);
-	accessBitBuffer[1] =          c1 << 4 | (~c3 & 0xF);
-	accessBitBuffer[2] =          c3 << 4 | c2;
+	accessBitBuffer[0] = (byte)((~c2 & 0xF) << 4 | (~c1 & 0xF));
+	accessBitBuffer[1] = (byte)(         c1 << 4 | (~c3 & 0xF));
+	accessBitBuffer[2] = (byte)(         c3 << 4 | c2);
 } // End MIFARE_SetAccessBits()
 
 /////////////////////////////////////////////////////////////////////////////////////
