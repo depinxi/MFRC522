@@ -27,10 +27,10 @@ workspace "MFRC522"
 			includedirs { "../src" }
 			links "MFRC522"
 			MFRC522(_OPTIONS["device"])
-			filter { "toolset:gcc or clang" }
+			filter {"toolset:gcc or clang"}
 				linkoptions { "-pthread" }
-			filter { "toolset:not(gcc or clang)" }
+			filter {"toolset:not(gcc or clang)"}
 				links { "pthread" }
-			filter ()
+			filter {}
 	end
 	
